@@ -27,7 +27,15 @@ export default function LoginPage() {
     });
 
     if (result?.ok) {
-      router.push("/order-list"); // ✅ ไปหน้า order-list
+      // ดึงข้อมูล session มาเพื่อตรวจสอบ role
+      const response = await fetch("/api/auth/session");
+      const session = await response.json();
+
+      if (session?.user?.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/order-list");
+      }
     } else {
       setError("Invalid credentials");
     }

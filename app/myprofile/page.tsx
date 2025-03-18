@@ -29,11 +29,18 @@ interface ExchangeRequest {
 }
 
 const MyProfile: React.FC = () => {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const [ownedItems, setOwnedItems] = useState<Item[]>([]);
   const [exchangeRequests, setExchangeRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [exchangeHistory, setExchangeHistory] = useState<ExchangeRequest[]>([]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: session?.user?.name ?? "",
+    email: session?.user?.email ?? "",
+    newPassword: "",
+    coin: session?.user?.coin ?? 0,
+  });
 
   // ✅ ดึงข้อมูลสินค้าของผู้ใช้
   const fetchOwnedItems = async () => {
@@ -205,7 +212,55 @@ const MyProfile: React.FC = () => {
         setLoading(false);
     }
 };
+  useEffect(() => {
+    if (session?.user) {
+      setProfileData({
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+        newPassword: "",
+        coin: session.user.coin ?? 0,
+      });
+    }
+  }, [session]);
 
+  
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProfileData({ ...profileData, [e.target.name]: e.target.value });
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const res = await fetch("/api/user/updateNamePass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet_address: session?.user?.wallet_address,
+          name: profileData.name,
+          newPassword: profileData.newPassword,
+          coin: profileData.coin,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Update profile failed");
+
+      alert("✅ Profile updated successfully");
+      await update(); // รีเฟรช session ที่ client หลังอัพเดต
+      setIsEditingProfile(false);
+    } catch (error) {
+      console.error("Update profile error:", error);
+      alert("❌ Failed to update profile");
+    }
+  };
+
+  const refreshEthBalance = async () => {
+    if (!window.ethereum || !session?.user?.wallet_address) return;
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const balance = await provider.getBalance(session.user.wallet_address);
+    const ethBalance = ethers.formatEther(balance);
+
+    setProfileData((prev) => ({ ...prev, coin: parseFloat(ethBalance) }));
+  };
 
 return (
     <div className="p-8 min-h-screen flex flex-col items-center">
@@ -216,10 +271,82 @@ return (
         <div className="w-2/3">
             {/* ✅ ข้อมูลโปรไฟล์ */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-                <h2 className="text-xl font-bold mb-2">Profile Information</h2>
-                <p><strong>Email:</strong> {session?.user?.email}</p>
-                <p><strong>Wallet Address:</strong> {session?.user?.wallet_address}</p>
+              <h2 className="text-xl font-bold mb-2">Profile Information</h2>
+              {isEditingProfile ? (
+                <>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Email:</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={profileData.email}
+                        onChange={handleProfileChange}
+                        disabled
+                        className="border rounded w-full p-2 bg-gray-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Name:</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={profileData.name}
+                        onChange={handleProfileChange}
+                        className="border rounded w-full p-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">New Password:</label>
+                      <input
+                        type="password"
+                        name="newPassword"
+                        value={profileData.newPassword}
+                        onChange={handleProfileChange}
+                        className="border rounded w-full p-2"
+                      />
+                    </div>
+                    <p><strong>Coin (ETH):</strong> {profileData.coin}</p>
+                    <button
+                      onClick={refreshEthBalance}
+                      className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                    >
+                      Refresh ETH Balance
+                    </button>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={handleSaveProfile}
+                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditingProfile(false)}
+                      className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p><strong>Email:</strong> {session?.user?.email}</p>
+                  <p><strong>Name:</strong> {session?.user?.name}</p>
+                  <p><strong>Wallet Address:</strong> {session?.user?.wallet_address}</p>
+                  <p><strong>Coin (ETH):</strong> {session?.user?.coin}</p>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    >
+                      Edit Name / Password
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+
   
             {/* ✅ สินค้าที่เป็นเจ้าของ */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-6">

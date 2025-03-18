@@ -6,6 +6,8 @@ declare module "next-auth" {
     email: string;
     wallet_address: string;
     coin: number;
+    role: "user" | "admin";
+    name: string;
   }
 
   interface Session {
@@ -15,5 +17,8 @@ declare module "next-auth" {
   interface JWT {
     wallet_address: string;
     coin: number;
+    role: "user" | "admin";
+    name: string;
+    email: string;
   }
 }
