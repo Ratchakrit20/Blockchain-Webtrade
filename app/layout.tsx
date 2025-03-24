@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import Nav from "./components/Nav";
 import  SessionProvider  from "./components/SessionProvider";
+import { ToastContainer } from 'react-toastify'; //alert
+import 'react-toastify/dist/ReactToastify.css'; //alert
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +25,7 @@ export default function RootLayout({
           <SessionProvider>
           <Nav/>
           {children}
+          <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
           </SessionProvider>
         </body>
       </html>

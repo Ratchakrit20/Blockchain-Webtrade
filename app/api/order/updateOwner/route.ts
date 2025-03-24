@@ -41,3 +41,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Server error", error: error }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    await connectToDatabase();
+    const { itemId, newOwner } = await req.json();
+
+    if (!itemId || !newOwner) {
+      return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+    }
+
+    const updatedItem = await Order.findByIdAndUpdate(
+      itemId,
+      { owner_wallet: newOwner },
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      return NextResponse.json({ message: "Item not found or failed to update" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Owner updated successfully", updatedItem }, { status: 200 });
+  } catch (error) {
+    console.error("❌ Error updating item owner:", error);
+    return NextResponse.json({ message: "Server error", error: error }, { status: 500 });
+  }
+}

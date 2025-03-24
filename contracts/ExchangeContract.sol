@@ -54,6 +54,16 @@ contract ExchangeContract {
 
         emit ExchangeRequested(exchangeId, msg.sender, _user_2_wallet);
     }
+    
+    function getAllExchanges() public view returns (ExchangeRequest[] memory) {
+    ExchangeRequest[] memory allExchanges = new ExchangeRequest[](exchangeCounter - 1);
+    uint256 index = 0;
+    for (uint256 i = 1; i < exchangeCounter; i++) {
+        allExchanges[index] = exchanges[i];
+        index++;
+    }
+    return allExchanges;
+}
 
     function getPendingExchanges(address wallet) public view returns (ExchangeRequest[] memory) {
         uint256 count = 0;

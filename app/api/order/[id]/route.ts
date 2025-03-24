@@ -30,4 +30,29 @@ export async function GET(
   }
 }
 
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  await connectToDatabase();
+  const { id } = params;
+  const data = await req.json();
+
+  try {
+    const updatedOrder = await Order.findByIdAndUpdate(id, data, { new: true });
+    return NextResponse.json(updatedOrder, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  await connectToDatabase();
+  const { id } = params;
+
+  try {
+    await Order.findByIdAndDelete(id);
+    return NextResponse.json({ message: "Order deleted successfully" }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete order" }, { status: 500 });
+  }
+}
+
 

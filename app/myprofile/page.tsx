@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { ethers } from "ethers";
 import contractConfig from "@/utils/exchangeContract"; // ✅ Import Smart Contract Config
 import ExchangeHis from "./ExchangeHis";
+import MyItems from "./MyItem";
 
 interface Item {
   _id: string;
@@ -41,6 +42,8 @@ const MyProfile: React.FC = () => {
     newPassword: "",
     coin: session?.user?.coin ?? 0,
   });
+  const [usdValue, setUsdValue] = useState<string | null>(null);
+  const [ethValue, setEthValue] = useState<Number | null>(null);
 
   // ✅ ดึงข้อมูลสินค้าของผู้ใช้
   const fetchOwnedItems = async () => {
@@ -88,10 +91,48 @@ const MyProfile: React.FC = () => {
         console.error("Failed to fetch exchange history:", error);
       }
     };
+  // ✅ ดึงราคา ETH และคำนวณค่าเงินในกระเป๋า
+  const fetchInitialEthPrice = async () => {
+      if (session?.user?.wallet_address) {
+        try {
+          const res = await fetch("/api/ethprice");
+          const data = await res.json();
+          console.log("ETH Price API response:", data);
+          if (!data.ethereum || !data.ethereum.usd) {
+            throw new Error("Invalid ETH price data");
+          }
+          const ethToUsd = data.ethereum.usd * Number(session.user.coin);
+
+
+          if (!window.ethereum || !session?.user?.wallet_address) return;
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const balance = await provider.getBalance(session.user.wallet_address);
+          const ethBalance = ethers.formatEther(balance);
+
+          const res_updatecoin = await fetch("/api/user/updateNamePass", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              wallet_address: session?.user?.wallet_address,
+              coin: parseFloat(ethBalance),
+            }),
+          });
+    
+          if (!res_updatecoin.ok) throw new Error("Update profile failed");
+          setEthValue(parseFloat(ethBalance));
+          setProfileData((prev) => ({ ...prev, coin: parseFloat(ethBalance) }));
+          setUsdValue(ethToUsd.toFixed(2));
+        } catch (error) {
+          console.error("Failed to fetch ETH price:", error);
+          setUsdValue("Error fetching value");
+        }
+      }
+    };
   
   useEffect(() => {
     fetchOwnedItems();
     fetchExchangeHistory();
+    fetchInitialEthPrice();
   }, [session]);
 
   // ✅ ดึงรายการขอแลกเปลี่ยนจาก Smart Contract
@@ -212,6 +253,7 @@ const MyProfile: React.FC = () => {
         setLoading(false);
     }
 };
+
   useEffect(() => {
     if (session?.user) {
       setProfileData({
@@ -252,15 +294,7 @@ const MyProfile: React.FC = () => {
     }
   };
 
-  const refreshEthBalance = async () => {
-    if (!window.ethereum || !session?.user?.wallet_address) return;
-
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const balance = await provider.getBalance(session.user.wallet_address);
-    const ethBalance = ethers.formatEther(balance);
-
-    setProfileData((prev) => ({ ...prev, coin: parseFloat(ethBalance) }));
-  };
+  
 
 return (
     <div className="p-8 min-h-screen flex flex-col items-center">
@@ -307,12 +341,6 @@ return (
                       />
                     </div>
                     <p><strong>Coin (ETH):</strong> {profileData.coin}</p>
-                    <button
-                      onClick={refreshEthBalance}
-                      className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-                    >
-                      Refresh ETH Balance
-                    </button>
                   </div>
                   <div className="mt-4 flex gap-2">
                     <button
@@ -334,7 +362,18 @@ return (
                   <p><strong>Email:</strong> {session?.user?.email}</p>
                   <p><strong>Name:</strong> {session?.user?.name}</p>
                   <p><strong>Wallet Address:</strong> {session?.user?.wallet_address}</p>
-                  <p><strong>Coin (ETH):</strong> {session?.user?.coin}</p>
+                  <div className="flex items-center gap-2">
+                    <p><strong>Coin (ETH):</strong> { ethValue !== null ? ethValue.toString() : "N/A" }</p>
+                    <span className="ml-2 text-gray-600 text-sm">
+                      ≈ {usdValue} USD
+                    </span>
+                    <button
+                      onClick={()=>fetchInitialEthPrice()}
+                      className="px-2 py-1 hover:opacity-80"
+                    >
+                      <img src="/money.png" alt="Refresh" className="w-6 h-6" />
+                    </button>
+                  </div>
                   <div className="mt-4 flex gap-2">
                     <button
                       onClick={() => setIsEditingProfile(true)}
@@ -349,23 +388,8 @@ return (
 
   
             {/* ✅ สินค้าที่เป็นเจ้าของ */}
-            <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-                        <h2 className="text-xl font-bold mb-2">My Items</h2>
-                        {ownedItems.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            {ownedItems.map((item) => (
-                            <div key={item._id} className="border p-4 rounded shadow">
-                                <img src={item.image_url} alt={item.name} className="w-full h-32 object-cover rounded mb-2" />
-                                <h3 className="font-bold">{item.name}</h3>
-                                <p className="text-sm">{item.description}</p>
-                                <p className="text-blue-500 font-bold">${item.price}</p>
-                            </div>
-                            ))}
-                        </div>
-                        ) : (
-                        <p className="text-gray-500">No items found.</p>
-                        )}
-            </div>
+            <MyItems ownedItems={ownedItems} fetchOwnedItems={fetchOwnedItems}/>
+            
 
             {/* ✅ รายการรอการยืนยัน */}
             <div className="bg-white shadow-lg rounded-lg p-6">

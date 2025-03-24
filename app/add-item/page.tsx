@@ -29,6 +29,7 @@ const AddItem: React.FC = () => {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
+  
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -53,6 +54,7 @@ const AddItem: React.FC = () => {
       }
     }
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -81,6 +83,7 @@ const AddItem: React.FC = () => {
       setError("Failed to add item.");
     }
   };
+
   // ดึง Wallet Address จาก MetaMask
   const connectWallet = async () => {
     if (typeof window !== "undefined" && window.ethereum) {
