@@ -7,7 +7,8 @@ import { toast } from "react-toastify";
 import DashUser from "./Dash-User";
 import DashItems from "./Dash-Item";
 import DashExchange from "./Dash-Exchange";
-// import DashTrade from "./Dash-Trade";
+import DashTrade from "./Dash-Trade";
+import DashDonate from "./Dash-Donate";
 
 interface UserInfo {
   _id: string;
@@ -41,10 +42,12 @@ export default function AdminDashboard() {
         return <DashUser users={users} onDelete={handleDeleteUser} />;
       case "Items":
         return <DashItems items={items} onDeleteItem={handleDeleteItem} />;
-      case "Exchange":
+      case "Exchange History":
         return <DashExchange />;
-      case "Trade":
-        // return <DashTrade />;
+      case "Trade History":
+        return <DashTrade />;
+      case "Donation History":
+        return <DashDonate />;
       default:
         return <p className="text-gray-500">Select a tab to view content.</p>;
     }
@@ -134,7 +137,7 @@ export default function AdminDashboard() {
       <div className="bg-white shadow rounded-lg p-4">
         <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
         <div className="flex space-x-4 border-b pb-2 mb-4">
-          {["User", "Items", "Exchange", "Trade"].map((tab) => (
+          {["User", "Items", "Exchange History", "Trade History", "Donation History"].map((tab) => (
             <button
               key={tab}
               className={`px-4 py-2 rounded-t-md ${

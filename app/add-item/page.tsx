@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ethers } from "ethers";
+import { toast } from "react-toastify";
+import { Wallet, Upload, PlusCircle } from "lucide-react";
 
 const AddItem: React.FC = () => {
-  const [error, setError] = useState("");
-  const [Success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -12,156 +12,156 @@ const AddItem: React.FC = () => {
     image_url: "",
     owner_wallet: "",
   });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, files } = e.target;
-  
-    if (type === "file" && files && files.length > 0) {
-      const reader = new FileReader();
-      reader.readAsDataURL(files[0]); // ✅ อ่านไฟล์เป็น url
-      reader.onload = () => {
-        setFormData((prev) => ({
-          ...prev,
-          image_url: reader.result as string, // ✅ เก็บค่า url ลง state
-        }));
-      };
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-  
-      const formData = new FormData();
-      formData.append("file", file);
-  
-      console.log("🚀 Uploading Image:", file.name); // ✅ ตรวจสอบไฟล์ที่กำลังอัปโหลด
-  
+      const formDataFile = new FormData();
+      formDataFile.append("file", file);
+
+      // แสดง preview รูปทันที
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
       const res = await fetch("/api/upload", {
         method: "POST",
-        body: formData,
+        body: formDataFile,
       });
-  
       const data = await res.json();
-      console.log("✅ Upload Response:", data); // ✅ ตรวจสอบค่าที่ API ส่งกลับมา
-  
+
       if (res.status === 201) {
-        setFormData((prev) => ({ ...prev, image_url: data.image_url })); // ✅ บันทึก URL
+        setFormData((prev) => ({ ...prev, image_url: data.image_url }));
+        toast.success("Image uploaded successfully!");
       } else {
-        setError("Failed to upload image.");
+        toast.error("Failed to upload image.");
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-  
-    console.log("🚀 Sending Data:", formData); // ✅ ตรวจสอบค่าที่กำลังส่งไป API
-  
     try {
       const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          price: Number(formData.price), // ✅ แปลง `price` เป็นตัวเลข
-        }),
+        body: JSON.stringify({ ...formData, price: Number(formData.price) }),
       });
-  
       const data = await res.json();
+
       if (res.status === 201) {
-        setSuccess("Item added successfully!");
+        toast.success("Item added successfully!");
         setFormData({ name: "", description: "", price: 0, image_url: "", owner_wallet: "" });
+        setImagePreview(null);
       } else {
-        setError(data.message);
+        toast.error(data.message || "Failed to add item.");
       }
-    } catch (error) {
-      setError("Failed to add item.");
+    } catch {
+      toast.error("Failed to add item.");
     }
   };
 
-  // ดึง Wallet Address จาก MetaMask
   const connectWallet = async () => {
-    if (typeof window !== "undefined" && window.ethereum) {
+    if (window.ethereum) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         await window.ethereum.request({ method: "eth_requestAccounts" });
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
-
-        setFormData((prev) => ({
-          ...prev,
-          owner_wallet: address,
-        }));
-
-        console.log("✅ Connected Wallet:", address);
+        setFormData((prev) => ({ ...prev, owner_wallet: address }));
+        toast.success(`Wallet Connected: ${address.slice(0, 6)}...`);
       } catch (error) {
-        console.error("❌ MetaMask Connection Error:", error);
+        toast.error("Wallet connection failed.");
       }
     } else {
-      alert("MetaMask not detected! Please install MetaMask.");
+      toast.error("Please install MetaMask!");
     }
   };
-  
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-4">
-      <h1 className="text-3xl font-bold mb-6">Add Item</h1>
-        <div className="p-4 border rounded shadow-md w-96">
-          <h2 className="text-xl font-bold mb-4">New Item</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              name="name"
-              placeholder="Item Name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full p-2 border rounded mb-2"
-              required
+    <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-white p-4">
+      <h1 className="text-4xl font-bold mb-6 text-gray-800">Add New Item</h1>
+      <div className="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">Product Information</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            name="name"
+            placeholder="Item Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <input
+            type="text"
+            name="description"
+            placeholder="Description"
+            value={formData.description}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <input
+            type="number"
+            name="price"
+            placeholder="Price (USD)"
+            value={formData.price}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <label className="block text-gray-500 text-sm mb-1">Upload Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full p-2 border border-gray-300 rounded-xl cursor-pointer bg-gray-50"
+            required
+          />
+          {imagePreview && (
+            <img
+              src={imagePreview}
+              alt="Preview"
+              className="w-full h-48 object-cover rounded-xl mt-2 shadow-md"
             />
-            <input
-              type="text"
-              name="description"
-              placeholder="Description"
-              value={formData.description}
-              onChange={handleChange}
-              className="w-full p-2 border rounded mb-2"
-              required
-            />
-            <input
-              type="number"
-              name="price"
-              placeholder="Price"
-              value={formData.price}
-              onChange={handleChange}
-              className="w-full p-2 border rounded mb-2"
-              required
-            />
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="w-full p-2 border rounded mb-2"
-              required
-            />
-            <button
-              type="button"
-              onClick={connectWallet}
-              className="w-full bg-gray-500 text-white p-2 rounded mb-2"
-            >
-              Connect MetaMask
-            </button>
-            <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">
-              Add Item
-            </button>
-            <p>{Success}</p>
-          </form>
-        </div>
-      </main>
+          )}
+
+          <button
+            type="button"
+            onClick={connectWallet}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gray-600 to-gray-800 text-white p-3 rounded-xl hover:scale-105 transition"
+          >
+            <Wallet size={20} />
+            Connect MetaMask
+          </button>
+          {formData.owner_wallet && (
+            <p className="text-sm text-gray-500 text-center">
+              Connected Wallet:{" "}
+              <span className="text-indigo-600 font-medium">
+                {formData.owner_wallet}
+              </span>
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-3 rounded-xl hover:scale-105 transition"
+          >
+            <PlusCircle size={20} />
+            Add Item
+          </button>
+        </form>
+      </div>
+    </main>
   );
 };
 

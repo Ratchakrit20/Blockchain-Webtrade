@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { ethers } from "ethers";
 import contractConfig from "@/utils/exchangeContract"; // ✅ Import Smart Contract Config
+import donatecontractConfig from "@/utils/donateContract";
 import ExchangeHis from "./ExchangeHis";
 import MyItems from "./MyItem";
+import TradeHis from "./TradeHis";
 
 interface Item {
   _id: string;
@@ -16,6 +18,11 @@ interface Item {
   image_url: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface UserInfo {
+  wallet_address: string;
+  name: string;
 }
 
 interface ExchangeRequest {
@@ -43,8 +50,59 @@ const MyProfile: React.FC = () => {
     coin: session?.user?.coin ?? 0,
   });
   const [usdValue, setUsdValue] = useState<string | null>(null);
-  const [ethValue, setEthValue] = useState<Number | null>(null);
+  const [ethValue, setEthValue] = useState<number | null>(null);
+  const [usdDonateValue, setUsdDonateValue] = useState<number | null>(0);
+  const [ethDonateValue, setEthDonateValue] = useState<number | null>(0);
+  const [showExchangeHistory, setShowExchangeHistory] = useState(false);
+  const [showTradeHistory, setShowTradeHistory] = useState(false);
 
+  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchItems();
+    if (session?.user) {
+      setProfileData({
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+        newPassword: "",
+        coin: session.user.coin ?? 0,
+      });
+    }
+  }, [session]);
+
+
+  const fetchUsers = async () => {
+    const res = await fetch("/api/user/allUsers");
+    const data = await res.json();
+    setUsers(data.users || []);
+  };
+
+  const fetchItems = async () => {
+    const res = await fetch("/api/order");
+    const data = await res.json();
+    setItems(data.orders || []);
+  };
+  // ✅ ฟังก์ชันช่วยในการแสดงชื่อผู้ใช้และชื่อสินค้า
+  const getUserName = (wallet: string) => {
+    const user = users.find((u) => u.wallet_address.toLowerCase() === wallet.toLowerCase());
+    return user ? user.name : wallet;
+  };
+  // ✅ ฟังก์ชันช่วยในการแสดงชื่อสินค้า
+  const getItemName = (id: string) => {
+    const item = items.find((i) => i._id === id);
+    return item ? item.name : id;
+  };
+  // ✅ ฟังก์ชันช่วยในการตรวจสอบว่าผู้ใช้มีอยู่ในระบบหรือไม่
+  const hasWallet = (wallet: string): boolean => {
+    return users.some((u) => u.wallet_address.toLowerCase() === wallet.toLowerCase());
+  };
+  // ✅ ฟังก์ชันช่วยในการตรวจสอบว่าผู้ใช้มีสินค้าในระบบหรือไม่
+  const hasItem = (id: string, wallet: string): boolean => {
+    const item = items.find((i) => i._id === id);
+    return item ? item.owner_wallet.toLowerCase() === wallet.toLowerCase() : false;
+  };
   // ✅ ดึงข้อมูลสินค้าของผู้ใช้
   const fetchOwnedItems = async () => {
         if (!session?.user?.wallet_address) return;
@@ -57,7 +115,8 @@ const MyProfile: React.FC = () => {
         } catch (error) {
           console.error(error);
         }
-      };
+  };
+  
   // ✅ ดึงประวัติการทำรายการ
   const fetchExchangeHistory = async () => {
       if (!session?.user?.wallet_address) return;
@@ -128,11 +187,43 @@ const MyProfile: React.FC = () => {
         }
       }
     };
+
+  // ✅ ดึงราคา ETH และ USD จาก Donate
+  const fetchDonateEthPrice = async () => {
+    if (!session?.user?.wallet_address) return;
+    if (typeof window === "undefined" || !window.ethereum) {
+        alert("❌ MetaMask not detected. Please install MetaMask.");
+        return;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        donatecontractConfig.address!,
+        donatecontractConfig.abi,
+        signer
+      );
+      const donations = await contract.getDonationsByAddress(session.user.wallet_address);
+      let ethSum = 0;
+      let usdSum = 0;
+      donations.forEach((d: any) => {
+        ethSum += parseFloat(ethers.formatEther(d.amount));
+        usdSum += Number(d.usdAmount);
+      });
+      setEthDonateValue(ethSum);
+      setUsdDonateValue(usdSum);
+    } catch (error) {
+      console.error("Failed to fetch ETH price:", error);
+      setUsdDonateValue(0);
+      setEthDonateValue(0);
+    }
+  };
   
   useEffect(() => {
     fetchOwnedItems();
     fetchExchangeHistory();
     fetchInitialEthPrice();
+    fetchDonateEthPrice();
   }, [session]);
 
   // ✅ ดึงรายการขอแลกเปลี่ยนจาก Smart Contract
@@ -174,8 +265,6 @@ const MyProfile: React.FC = () => {
     fetchExchangeRequests();
   }, [session]);
   
- 
-
   // ✅ จัดการการยอมรับหรือปฏิเสธการแลกเปลี่ยน และส่งค่า `transaction_hash`
   const handleExchangeDecision = async (exchangeId: number, decision: "accept" | "reject", item_1_id: string, item_2_id: string, user_1_wallet: string, user_2_wallet: string) => {
     if (typeof window === "undefined" || !window.ethereum) {
@@ -240,10 +329,10 @@ const MyProfile: React.FC = () => {
     
           const data = await res.json();
           console.log("✅ Owner updated:", data);
-          fetchOwnedItems();
-          fetchExchangeHistory();
         }
 
+        fetchOwnedItems();
+        fetchExchangeHistory();
         alert(`✅ Exchange ${decision}ed successfully with TX: ${txHash}`);
         setExchangeRequests((prev) => prev.filter((req) => req.exchange_id !== exchangeId));
     } catch (error) {
@@ -254,22 +343,13 @@ const MyProfile: React.FC = () => {
     }
 };
 
-  useEffect(() => {
-    if (session?.user) {
-      setProfileData({
-        name: session.user.name ?? "",
-        email: session.user.email ?? "",
-        newPassword: "",
-        coin: session.user.coin ?? 0,
-      });
-    }
-  }, [session]);
 
-  
+
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfileData({ ...profileData, [e.target.name]: e.target.value });
   };
 
+  // ✅ อัพเดตข้อมูลโปรไฟล์
   const handleSaveProfile = async () => {
     try {
       const res = await fetch("/api/user/updateNamePass", {
@@ -363,9 +443,13 @@ return (
                   <p><strong>Name:</strong> {session?.user?.name}</p>
                   <p><strong>Wallet Address:</strong> {session?.user?.wallet_address}</p>
                   <div className="flex items-center gap-2">
-                    <p><strong>Coin (ETH):</strong> { ethValue !== null ? ethValue.toString() : "N/A" }</p>
+                  <p><strong>Coin (ETH):</strong> { ethValue !== null ? ethValue.toString() : "N/A" }</p>
                     <span className="ml-2 text-gray-600 text-sm">
                       ≈ {usdValue} USD
+                    </span>
+                  <p><strong>💰ETH Donated:</strong> { ethDonateValue !== null ? ethDonateValue.toString() : "N/A" }</p>
+                    <span className="ml-2 text-gray-600 text-sm">
+                      ≈ {usdDonateValue} USD
                     </span>
                     <button
                       onClick={()=>fetchInitialEthPrice()}
@@ -395,44 +479,125 @@ return (
             <div className="bg-white shadow-lg rounded-lg p-6">
                 <h2 className="text-xl font-bold mb-2">Pending Exchange Requests</h2>
                 {exchangeRequests.length > 0 ? (
-                exchangeRequests.map((request) => (
-                    <div key={request.exchange_id} className="border p-4 rounded shadow mb-4">
-                    <p><strong>Exchange ID:</strong> {request.exchange_id}</p>
-                    <p><strong>From:</strong> {request.user_1_wallet}</p>
-                    <p><strong>To:</strong> {request.user_2_wallet}</p>
-                    <p><strong>Item Offered:</strong> {request.item_1_id}</p>
-                    <p><strong>Requested Item:</strong> {request.item_2_id}</p>
-                    <p><strong>Status:</strong> {request.status === 0 ? "Pending" : request.status === 1 ? "Accepted" : "Rejected"}</p>
-    
-                    {request.status === 0 && request.user_2_wallet === session?.user?.wallet_address && (
-                        <div className="mt-2 flex gap-2">
-                        <button
-                          className="bg-green-500 text-white p-2 rounded"
-                          onClick={() => handleExchangeDecision(request.exchange_id, "accept", request.item_1_id, request.item_2_id, request.user_1_wallet, request.user_2_wallet)}
-                          disabled={loading}
-                        >
-                          Accept
-                        </button>
+                  exchangeRequests.map((request) => {
+                    const isValidUser1 = hasWallet(request.user_1_wallet);
+                    const isValidUser2 = hasWallet(request.user_2_wallet);
+                    const ownsItem1 = hasItem(request.item_1_id, request.user_1_wallet);
+                    const ownsItem2 = hasItem(request.item_2_id, request.user_2_wallet);
+                    const isExchangeValid = isValidUser1 && isValidUser2 && ownsItem1 && ownsItem2;
 
-                        <button 
-                          className="bg-red-500 text-white p-2 rounded" 
-                          onClick={() => handleExchangeDecision(request.exchange_id, "accept", request.item_1_id, request.item_2_id, request.user_1_wallet, request.user_2_wallet)} 
-                          disabled={loading}
-                        >
-                            Reject
-                        </button>
-                        </div>
-                    )}
-                    </div>
-                ))
+                    return (
+                      <div key={request.exchange_id} className="border p-4 rounded shadow mb-4">
+                        <p><strong>Exchange ID:</strong> {request.exchange_id}</p>
+                        <p><strong>From:</strong> {getUserName(request.user_1_wallet)}</p>
+                        <p><strong>To:</strong> {getUserName(request.user_2_wallet)}</p>
+                        <p><strong>Item Offered:</strong> {getItemName(request.item_1_id)}</p>
+                        <p><strong>Requested Item:</strong> {getItemName(request.item_2_id)}</p>
+                        <p><strong>Status:</strong> {request.status === 0 ? "Pending" : request.status === 1 ? "Accepted" : "Rejected"}</p>
+
+                        {request.status === 0 && request.user_2_wallet === session?.user?.wallet_address && (
+                          <div className="mt-2 flex flex-col gap-2">
+                            {isExchangeValid ? (
+                              <div className="flex gap-2">
+                                <button
+                                  className="bg-green-500 text-white p-2 rounded"
+                                  onClick={() =>
+                                    handleExchangeDecision(
+                                      request.exchange_id,
+                                      "accept",
+                                      request.item_1_id,
+                                      request.item_2_id,
+                                      request.user_1_wallet,
+                                      request.user_2_wallet
+                                    )
+                                  }
+                                  disabled={loading}
+                                >
+                                  Accept
+                                </button>
+
+                                <button
+                                  className="bg-red-500 text-white p-2 rounded"
+                                  onClick={() =>
+                                    handleExchangeDecision(
+                                      request.exchange_id,
+                                      "reject",
+                                      request.item_1_id,
+                                      request.item_2_id,
+                                      request.user_1_wallet,
+                                      request.user_2_wallet
+                                    )
+                                  }
+                                  disabled={loading}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-red-500 text-sm font-medium">
+                                  *** คุณหรือคนขอแลก ไม่มีบัญชี/สินค้า
+                                </p>
+                                <button
+                                  className="bg-red-500 text-white p-2 rounded"
+                                  onClick={() =>
+                                    handleExchangeDecision(
+                                      request.exchange_id,
+                                      "reject",
+                                      request.item_1_id,
+                                      request.item_2_id,
+                                      request.user_1_wallet,
+                                      request.user_2_wallet
+                                    )
+                                  }
+                                  disabled={loading}
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
-                <p>No pending exchange requests.</p>
+                  <p>No pending exchange requests.</p>
                 )}
+
             </div>
         </div>
-    
-            {/* ✅ ด้านขวา: คอมโพเนนต์ Exchange History */}
-            <ExchangeHis exchangeHistory={exchangeHistory}/>
+
+
+          {/* Accordion: Exchange History */}
+          <div>
+            <button
+              onClick={() => setShowExchangeHistory(!showExchangeHistory)}
+              className="w-full text-left px-6 py-4 font-semibold text-lg hover:bg-gray-100 rounded-xl flex justify-between items-center bg-white shadow"
+            >
+              Exchange History
+              <span>{showExchangeHistory ? "▲" : "▼"}</span>
+            </button>
+
+            {/* ✅ ค่อยโชว์คอนเทนต์ตอนคลิก */}
+            {showExchangeHistory && (
+              <ExchangeHis exchangeHistory={exchangeHistory} />
+            )}
+          </div>
+
+          {/* Accordion: Trade History */}
+          <div >
+            <button
+              onClick={() => setShowTradeHistory(!showTradeHistory)}
+              className="w-full text-left px-6 py-4 font-semibold text-lg hover:bg-gray-100 rounded-xl flex justify-between items-center bg-white shadow"
+            >
+              Trade History
+              <span>{showTradeHistory ? "▲" : "▼"}</span>
+            </button>
+            {showTradeHistory && (
+              <TradeHis walletAddress={session?.user?.wallet_address ?? ""} />
+            )}
+          </div>
       </div>
     </div>
   );

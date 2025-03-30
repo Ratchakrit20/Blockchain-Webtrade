@@ -82,6 +82,11 @@ export default function DashExchange() {
     return item ? item.name : id;
   };
 
+  const formatDate = (timestamp: number | string) => {
+    const date = new Date(Number(timestamp) * 1000);
+    return date.toLocaleString("en-GB"); // หรือ th-TH ก็ได้
+  };
+
   return (
     <div className="p-6">
         <h2 className="text-2xl font-bold mb-6 text-gray-800">Exchange Requests</h2>
@@ -90,11 +95,13 @@ export default function DashExchange() {
             <thead className="bg-gray-100">
                 <tr>
                 <th className="px-4 py-3 text-left text-gray-700">ID</th>
-                <th className="px-4 py-3 text-left text-gray-700">ผู้ขอ (User 1)</th>
-                <th className="px-4 py-3 text-left text-gray-700">ผู้รับ (User 2)</th>
-                <th className="px-4 py-3 text-left text-gray-700">สินค้า (Item 1)</th>
-                <th className="px-4 py-3 text-left text-gray-700">สินค้า (Item 2)</th>
-                <th className="px-4 py-3 text-center text-gray-700">สถานะ</th>
+                <th className="px-4 py-3 text-left text-gray-700">Exchange Requester </th>
+                <th className="px-4 py-3 text-left text-gray-700">Exchange Recipient </th>
+                <th className="px-4 py-3 text-left text-gray-700">Product Exchange Items </th>
+                <th className="px-4 py-3 text-left text-gray-700">Products requested for exchange </th>
+                <th className="px-4 py-3 text-center text-gray-700">Status</th>
+                <th className="px-4 py-3 text-center">Transaction</th>
+                <th className="px-4 py-3 text-center">Time</th>
                 </tr>
             </thead>
             <tbody>
@@ -122,6 +129,17 @@ export default function DashExchange() {
                         : "Rejected"}
                     </span>
                     </td>
+                    <td className="px-4 py-3 text-center max-w-xs break-words">
+                    <a
+                        href={`https://etherscan.io/tx/${ex.transaction_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline"
+                    >
+                        {ex.transaction_hash.slice(0, 8)}...{ex.transaction_hash.slice(-6)}
+                    </a>
+                    </td>
+                    <td className="px-4 py-3 text-center">{formatDate(ex.timestamp)}</td>
                 </tr>
                 ))}
             </tbody>

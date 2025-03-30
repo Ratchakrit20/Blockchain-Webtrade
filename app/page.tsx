@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { LogIn, UserPlus, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +28,6 @@ export default function LoginPage() {
     });
 
     if (result?.ok) {
-      // ดึงข้อมูล session มาเพื่อตรวจสอบ role
       const response = await fetch("/api/auth/session");
       const session = await response.json();
 
@@ -37,47 +37,57 @@ export default function LoginPage() {
         router.push("/order-list");
       }
     } else {
-      setError("Invalid credentials");
+      setError("Invalid email or password.");
     }
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md w-96">
-        <h1 className="text-xl font-bold mb-4">Login</h1>
-        {error && <p className="text-red-500">{error}</p>}
-
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-2"
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          value={formData.password}
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-2"
-          required
-        />
-
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">
-          Login
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/register")}
-          className="w-full bg-gray-500 text-white p-2 rounded mt-2"
-        >
-          Register
-        </button>
-      </form>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
+      <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md">
+        <h1 className="text-3xl font-bold mb-2 text-center text-gray-700">Welcome</h1>
+        <p className="text-center text-gray-500 mb-6">Please login to continue</p>
+        {error && (
+          <div className="flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-xl mb-4">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-3 rounded-xl hover:scale-105 transition"
+          >
+            <LogIn size={20} />
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/register")}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gray-500 to-gray-700 text-white p-3 rounded-xl hover:scale-105 transition"
+          >
+            <UserPlus size={20} />
+            Register
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

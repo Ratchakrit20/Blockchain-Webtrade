@@ -26,6 +26,7 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
   const [item, setItem] = useState<Item | null>(null);
   const [ethPrice, setEthPrice] = useState<number | null>(null);
 
+  // ✅ ดึงข้อมูลสินค้าและราคา ETH จาก API เมื่อโหลดหน้า
   useEffect(() => {
     if (!itemId) return;
 
@@ -33,7 +34,6 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
       try {
         const res = await fetch(`/api/order/${itemId}`);
         if (!res.ok) throw new Error("Failed to fetch item");
-
         const data = await res.json();
         setItem(data);
       } catch (error) {
@@ -43,8 +43,9 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
 
     const fetchEthPrice = async () => {
       try {
-        // Example: Fetch real-time ETH price in USD from CoinGecko API
-        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+        const res = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        );
         const data = await res.json();
         setEthPrice(data.ethereum.usd);
       } catch (error) {
@@ -56,24 +57,25 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
     fetchEthPrice();
   }, [itemId]);
 
+  // ✅ ฟังก์ชันสำหรับดำเนินการสั่งซื้อและบันทึกข้อมูลการซื้อบน Blockchain
   const handleBuyNow = async () => {
     if (!item || !session?.user?.wallet_address || !ethPrice) return;
     const buyerWallet = session.user.wallet_address;
 
     try {
-      // Convert USD price to ETH
+      // ✅ แปลง USD เป็น ETH
       const priceInEth = (item.price / ethPrice).toFixed(6);
       console.log(`Converting ${item.price} USD to ${priceInEth} ETH`);
 
-      // Connect wallet
+      // ✅ เชื่อมต่อ MetaMask wallet
       if (!window.ethereum) {
         alert("❌ MetaMask not found!");
         return;
-        }
+      }
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // Send ETH transaction
+      // ✅ ส่ง ETH ไปยังเจ้าของสินค้า
       const tx = await signer.sendTransaction({
         to: item.owner_wallet,
         value: ethers.parseEther(priceInEth),
@@ -82,16 +84,17 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
       await tx.wait();
       console.log("Transaction hash:", tx.hash);
 
-      // ✅ ตรวจสอบค่า Smart Contract ก่อนใช้งาน
+      // ✅ เชื่อมต่อ Smart Contract สำหรับบันทึกข้อมูลการซื้อ
       if (!tradecontractConfig.abi || !process.env.NEXT_PUBLIC_TRADE_CONTRACT_ADDRESS) {
         throw new Error("Smart contract config is missing!");
-        }
+      }
       const contract = new ethers.Contract(
-        process.env.NEXT_PUBLIC_TRADE_CONTRACT_ADDRESS, 
-        tradecontractConfig.abi, 
+        process.env.NEXT_PUBLIC_TRADE_CONTRACT_ADDRESS,
+        tradecontractConfig.abi,
         signer
-    );
+      );
 
+      // ✅ เรียก recordTrade() เพื่อบันทึกธุรกรรมลง blockchain
       await contract.recordTrade(
         tx.hash,
         buyerWallet,
@@ -103,7 +106,7 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
         tx.hash
       );
 
-      // Update item ownership in the database
+      // ✅ อัปเดตเจ้าของใน database หลังซื้อสำเร็จ
       await fetch(`/api/order/updateOwner`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -113,7 +116,7 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
         }),
       });
 
-      alert("✅ Purchase successful! Ownership updated and trade recorded on blockchain.");
+      alert("✅ Purchase successful! Ownership updated and trade recorded.");
       router.push("/order-list");
     } catch (error) {
       console.error("Transaction failed:", error);
@@ -122,32 +125,34 @@ const Buy: React.FC<BuyProps> = ({ itemId }) => {
   };
 
   return (
-    <div>
+    <div className="flex items-center justify-center min-l-screen bg-gradient-to-br from-gray-90 to-white p-4">
       {item ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="bg-white shadow-lg rounded-lg p-4 max-w-sm">
-            <img
-              src={item.image_url}
-              alt={item.name}
-              className="w-full h-48 object-cover rounded-md"
-            />
-            <div className="mt-4">
-              <h3 className="text-xl font-bold">{item.name}</h3>
-              <p className="text-gray-600">{item.description}</p>
-              <p className="text-blue-500 font-bold text-lg">{item.price} USD</p>
-              <p className="text-sm text-gray-400">
-                Owner: <span className="font-mono">{item.owner_wallet}</span>
+        <div className="bg-white shadow-2xl rounded-3xl p-6 max-w-sm w-full transition hover:scale-[1.02]">
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="w-full h-60 object-cover rounded-xl shadow"
+          />
+          <div className="mt-5">
+            <h3 className="text-2xl font-bold text-gray-800 mb-1">{item.name}</h3>
+            <p className="text-gray-500 mb-2">{item.description}</p>
+            <p className="text-xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-transparent bg-clip-text">
+              {item.price} USD
+            </p>
+            <p className="text-xs text-gray-400 mt-1 truncate">
+              Owner: {item.owner_wallet}
+            </p>
+            {ethPrice && (
+              <p className="text-green-500 text-sm mt-2">
+                (≈ {(item.price / ethPrice).toFixed(6)} ETH)
               </p>
-              {ethPrice && (
-                <p className="text-green-500 text-sm">(≈ {(item.price / ethPrice).toFixed(6)} ETH)</p>
-              )}
-              <button
-                onClick={handleBuyNow}
-                className="mt-4 w-full bg-yellow-400 text-black font-bold py-2 rounded-md hover:bg-yellow-500 transition"
-              >
-                BUY NOW
-              </button>
-            </div>
+            )}
+            <button
+              onClick={handleBuyNow}
+              className="mt-6 w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold py-3 rounded-2xl text-lg shadow hover:scale-105 transition"
+            >
+              BUY NOW
+            </button>
           </div>
         </div>
       ) : (

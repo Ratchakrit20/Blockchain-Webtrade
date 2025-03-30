@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { ethers } from "ethers";
-import contractConfig from "../../utils/exchangeContract"; // ✅ Import Smart Contract ABI
+import contractConfig from "../../utils/exchangeContract";
 
 interface ExchangeProps {
     itemId: string | null;
@@ -26,6 +26,7 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
     const [loading, setLoading] = useState(false);
     const { data: session } = useSession();
 
+    // ✅ ดึงข้อมูลสินค้าที่ต้องการแลกเปลี่ยนจาก itemId
     useEffect(() => {
         if (!itemId) return;
 
@@ -33,7 +34,6 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
             try {
                 const res = await fetch(`/api/order/${itemId}`);
                 if (!res.ok) throw new Error("Failed to fetch item");
-
                 const data = await res.json();
                 setItem(data);
             } catch (error) {
@@ -44,6 +44,7 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
         fetchItem();
     }, [itemId]);
 
+    // ✅ ดึงรายการสินค้าของผู้ใช้จาก wallet ที่ login อยู่
     useEffect(() => {
         if (!session?.user?.wallet_address) return;
 
@@ -62,7 +63,7 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
         fetchUserItems();
     }, [session]);
 
-    // ✅ ฟังก์ชันขอแลกเปลี่ยน
+    // ✅ ฟังก์ชันสำหรับส่งคำขอแลกเปลี่ยนไปยัง Smart Contract บน Blockchain
     const handleExchangeRequest = async () => {
         if (!selectedItem || !item) return;
         setLoading(true);
@@ -73,32 +74,31 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
                 return;
             }
 
-            // ✅ ตั้งค่าการเชื่อมต่อ Ethereum Provider
+            // ✅ เชื่อมต่อ Ethereum ผ่าน MetaMask
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
 
-            // ✅ ตรวจสอบค่า Smart Contract ก่อนใช้งาน
+            // ✅ ตรวจสอบว่ามีการตั้งค่า Smart Contract หรือไม่
             if (!contractConfig.abi || !process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT_ADDRESS) {
                 throw new Error("Smart contract config is missing!");
             }
 
-            // ✅ ใช้เฉพาะ `abi` ในการเชื่อมต่อ Smart Contract
+            // ✅ สร้างอินสแตนซ์ contract ที่เชื่อมต่อ signer
             const contract = new ethers.Contract(
                 process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT_ADDRESS,
-                contractConfig.abi, // ✅ ใช้ `abi` เท่านั้น
+                contractConfig.abi,
                 signer
             );
 
-            // ✅ ส่งธุรกรรมไปยัง Smart Contract
+            // ✅ เรียกใช้ฟังก์ชัน requestExchange บน Smart Contract
             const tx = await contract.requestExchange(
-                item.owner_wallet, // user_2_wallet
-                selectedItem._id, // item_1_id
-                item._id // item_2_id
+                item.owner_wallet,
+                selectedItem._id,
+                item._id
             );
 
             await tx.wait();
-            console.log("🔗 Transaction Hash:", tx.hash); // ✅ ดึงค่า `_transaction_hash`
-
+            console.log("🔗 Transaction Hash:", tx.hash);
             alert("✅ Exchange request sent to blockchain!");
         } catch (error) {
             console.error(error);
@@ -109,22 +109,24 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
     };
 
     return (
-        <div className="flex flex-row items-start justify-center min-h-screen p-8 gap-6">
-            {/* ✅ ฝั่งซ้าย: แสดงสินค้าที่ต้องการแลก */}
-            <div className="bg-white shadow-lg rounded-lg p-4 max-w-md">
+        <div className="flex flex-row items-start justify-center min-l-screen p-8 gap-10 bg-gradient-to-br from-gray-90 to-white">
+            {/* ✅ ฝั่งซ้าย: แสดงข้อมูลสินค้าที่ต้องการแลก */}
+            <div className="bg-white shadow-2xl rounded-3xl p-6 max-w-md w-full transition hover:scale-[1.02]">
                 {item ? (
                     <>
                         <img
                             src={item.image_url}
                             alt={item.name}
-                            className="w-full h-48 object-cover rounded-md"
+                            className="w-full h-60 object-cover rounded-xl shadow-sm"
                         />
-                        <div className="mt-4">
-                            <h3 className="text-xl font-bold">{item.name}</h3>
-                            <p className="text-gray-600">{item.description}</p>
-                            <p className="text-blue-500 font-bold text-lg">${item.price}</p>
-                            <p className="text-sm text-gray-400">
-                                Owner: <span className="font-mono">{item.owner_wallet}</span>
+                        <div className="mt-5">
+                            <h3 className="text-2xl font-bold text-gray-800 mb-1">{item.name}</h3>
+                            <p className="text-gray-500 mb-2">{item.description}</p>
+                            <p className="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-transparent bg-clip-text">
+                                ${item.price}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1 truncate">
+                                Owner: {item.owner_wallet}
                             </p>
                         </div>
                     </>
@@ -133,44 +135,46 @@ const Exchange: React.FC<ExchangeProps> = ({ itemId }) => {
                 )}
             </div>
 
-            {/* ✅ ฝั่งขวา: เลือกสินค้า */}
-            <div className="bg-white shadow-lg rounded-lg p-4 max-w-md w-full">
-                <h4 className="text-lg font-bold mb-2">Select Item to Exchange:</h4>
-                <div className="grid grid-cols-2 gap-4 mt-2">
+            {/* ✅ ฝั่งขวา: เลือกรายการสินค้าของผู้ใช้สำหรับใช้แลก */}
+            <div className="bg-white shadow-2xl rounded-3xl p-6 max-w-md w-full">
+                <h4 className="text-xl font-bold mb-4 text-gray-700">Select Item to Exchange:</h4>
+                <div className="grid grid-cols-2 gap-4">
                     {userItems.map((userItem) => (
                         <button
                             key={userItem._id}
-                            className={`p-2 border rounded w-full flex flex-col items-center ${
-                                selectedItem?._id === userItem._id ? "bg-blue-400 text-white" : "bg-gray-100"
+                            className={`p-3 border rounded-2xl w-full flex flex-col items-center gap-2 transition hover:scale-105 ${
+                                selectedItem?._id === userItem._id
+                                    ? "bg-indigo-500 text-white"
+                                    : "bg-gray-100"
                             }`}
                             onClick={() => setSelectedItem(userItem)}
                         >
                             <img
                                 src={userItem.image_url}
                                 alt={userItem.name}
-                                className="w-16 h-16 object-cover rounded"
+                                className="w-20 h-20 object-cover rounded-xl shadow"
                             />
-                            <p className="text-sm">{userItem.name}</p>
+                            <p className="text-sm font-semibold">{userItem.name}</p>
                         </button>
                     ))}
                 </div>
 
-                {/* ✅ แสดงสินค้าที่เลือก */}
+                {/* ✅ แสดงสินค้าที่เลือกอยู่ */}
                 {selectedItem && (
-                    <div className="mt-4 p-4 border rounded bg-gray-100">
-                        <h4 className="text-lg font-bold">Selected Item:</h4>
+                    <div className="mt-6 p-4 border rounded-2xl bg-gray-100 shadow-inner">
+                        <h4 className="text-lg font-semibold mb-2 text-gray-700">Selected Item:</h4>
                         <img
                             src={selectedItem.image_url}
                             alt={selectedItem.name}
-                            className="w-full h-32 object-cover rounded"
+                            className="w-full h-40 object-cover rounded-xl"
                         />
-                        <p className="text-sm font-bold">{selectedItem.name}</p>
+                        <p className="text-center mt-2 font-bold text-gray-800">{selectedItem.name}</p>
                     </div>
                 )}
 
                 <button
-                    className={`mt-4 w-full bg-yellow-400 text-black font-bold py-2 rounded-md ${
-                        loading ? "opacity-50 cursor-not-allowed" : "hover:bg-yellow-500 transition"
+                    className={`mt-6 w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-bold py-3 rounded-2xl text-lg shadow hover:scale-105 transition ${
+                        loading ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                     onClick={handleExchangeRequest}
                     disabled={loading}

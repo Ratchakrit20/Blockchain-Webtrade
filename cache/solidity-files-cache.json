@@ -72,6 +72,42 @@
       "artifacts": [
         "TradeRecord"
       ]
+    },
+    "C:\\Users\\prad.R\\Blockchain\\blockchainapp-trade\\contracts\\DonateContract.sol": {
+      "lastModificationDate": 1743328744310,
+      "contentHash": "44d6f189750bf593b57a2551d2985ed9",
+      "sourceName": "contracts/DonateContract.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "DonateContract"
+      ]
     }
   }
 }

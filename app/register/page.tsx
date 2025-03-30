@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrowserProvider, formatUnits } from "ethers";
+import { toast } from "react-toastify";
+import { Wallet, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -11,14 +14,13 @@ export default function RegisterPage() {
     email: "",
     password: "",
     wallet_address: "",
-    coin:0, // เพิ่ม Wallet Address
+    coin: 0,
   });
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [walletConnected, setWalletConnected] = useState(false);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  // ฟังก์ชันดึง Wallet Address และยอด ETH จาก MetaMask
   const connectWallet = async () => {
     if (typeof window !== "undefined" && window.ethereum) {
       try {
@@ -26,112 +28,115 @@ export default function RegisterPage() {
         await window.ethereum.request({ method: "eth_requestAccounts" });
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
-
-        // ✅ ดึงยอด ETH ของ Address นี้
         const balanceWei = await provider.getBalance(address);
-        const balanceEth = Number(formatUnits(balanceWei, 18)); // แปลงจาก Wei เป็น ETH
+        const balanceEth = Number(formatUnits(balanceWei, 18));
 
         setFormData((prev) => ({
           ...prev,
           wallet_address: address,
-          coin: balanceEth, // ✅ ใส่ค่าลงไปใน formData
+          coin: balanceEth,
         }));
 
-        setWalletConnected(true);
-        console.log(`✅ Connected Wallet: ${address}, Balance: ${balanceEth} ETH`);
+        toast.success(`Connected: ${address.slice(0, 6)}... (${balanceEth.toFixed(3)} ETH)`);
       } catch (error) {
-        console.error("❌ MetaMask Connection Error:", error);
+        toast.error("MetaMask connection failed.");
       }
     } else {
-      alert("MetaMask not detected! Please install MetaMask.");
+      toast.error("MetaMask not detected. Please install it.");
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-  
-    // ✅ เช็คว่ามี wallet_address จริง ๆ ก่อนสมัคร
+
     if (!formData.wallet_address) {
-      setError("Please connect your MetaMask wallet before registering.");
+      toast.error("Please connect your MetaMask wallet first.");
       return;
     }
-  
+
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
     });
-  
+
     const data = await res.json();
     if (res.status === 201) {
-      setSuccess("Registration successful! Redirecting...");
+      toast.success("Registration successful! Redirecting...");
       setTimeout(() => router.push("/"), 2000);
     } else {
-      setError(data.message);
+      toast.error(data.message || "Registration failed.");
     }
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md w-96">
-        <h1 className="text-xl font-bold mb-4">Register</h1>
-        {error && <p className="text-red-500">{error}</p>}
-        {success && <p className="text-green-500">{success}</p>}
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
+      <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center text-gray-700 mb-2">Create Your Account</h1>
+        <p className="text-center text-gray-500 mb-6">Sign up to get started with trading</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            name="name"
+            placeholder="Full Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            required
+          />
 
-        <input
-          type="text"
-          name="name"
-          placeholder="Full Name"
-          value={formData.name}
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-2"
-          required
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-2"
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          value={formData.password}
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-2"
-          required
-        />
+          <button
+            type="button"
+            onClick={connectWallet}
+            className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl transition hover:scale-105 ${
+              formData.wallet_address
+                ? "bg-gradient-to-r from-green-500 to-green-600 text-white"
+                : "bg-gradient-to-r from-gray-500 to-gray-700 text-white"
+            }`}
+          >
+            <Wallet size={20} />
+            {formData.wallet_address ? "Wallet Connected" : "Connect MetaMask"}
+          </button>
 
-        {/* ปุ่มเชื่อมต่อ MetaMask */}
-        <button
-          type="button"
-          onClick={connectWallet}
-          className={`w-full p-2 rounded mb-2 ${
-            formData.wallet_address ? "bg-green-500 text-white" : "bg-gray-500 text-white"
-          }`}
-        >
-          {formData.wallet_address ? "Wallet Connected ✅" : "Connect MetaMask"}
-        </button>
+          {formData.wallet_address && (
+            <div className="text-center text-sm text-gray-600 mt-1">
+              Wallet Address:{" "}
+              <span className="text-indigo-600 font-medium">
+                {formData.wallet_address}
+              </span>
+              <div className="text-xs text-gray-500">
+                Balance: {formData.coin.toFixed(4)} ETH
+              </div>
+            </div>
+          )}
 
-        {/* แสดง Wallet Address */}
-        {formData.wallet_address && (
-          <p className="text-sm text-gray-600 mb-2">Wallet: {formData.wallet_address}</p>
-        )}
-
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">
-          Register
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-3 rounded-xl hover:scale-105 transition"
+          >
+            <UserPlus size={20} />
+            Register
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

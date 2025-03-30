@@ -18,8 +18,7 @@ interface ExchangeHistoryProps {
 }
 
 const ExchangeHis: React.FC<ExchangeHistoryProps> = ({ exchangeHistory }) => {
-  const [hoveredText, setHoveredText] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
 
   const [walletNames, setWalletNames] = useState<{ [key: string]: string }>({});
   const [itemNames, setItemNames] = useState<{ [key: string]: string }>({});
@@ -41,7 +40,7 @@ const ExchangeHis: React.FC<ExchangeHistoryProps> = ({ exchangeHistory }) => {
     if (itemNames[itemId]) return;
     try {
       const res = await fetch(`/api/order/${itemId}`);
-      if (!res.ok) throw new Error("Item not found");
+      // if (!res.ok) throw new Error("Item not found");
       const data = await res.json();
       setItemNames((prev) => ({ ...prev, [itemId]: data.name || itemId }));
     } catch (error) {
@@ -51,113 +50,114 @@ const ExchangeHis: React.FC<ExchangeHistoryProps> = ({ exchangeHistory }) => {
   };
 
   useEffect(() => {
-    if (hoveredText && walletNames[hoveredText]) {
-      setHoveredText(walletNames[hoveredText]);
-    }
-    if (hoveredText && itemNames[hoveredText]) {
-      setHoveredText(itemNames[hoveredText]);
-    }
-  }, [walletNames, itemNames]);
+    const loadAllNames = async () => {
+      const walletSet = new Set<string>();
+      const itemSet = new Set<string>();
+  
+      exchangeHistory.forEach((record) => {
+        walletSet.add(record.user_1_wallet);
+        walletSet.add(record.user_2_wallet);
+        itemSet.add(record.item_1_id);
+        itemSet.add(record.item_2_id);
+      });
+  
+      await Promise.all(Array.from(walletSet).map((wallet) => fetchUserName(wallet)));
+      await Promise.all(Array.from(itemSet).map((itemId) => fetchItemName(itemId)));
 
-  const handleMouseEnter = async (text: string, type: "wallet" | "item", event: React.MouseEvent) => {
-    setTooltipPosition({ x: event.clientX + 10, y: event.clientY + 10 });
-    setHoveredText(text);
-
-    if (type === "wallet") {
-      await fetchUserName(text);
-    } else if (type === "item") {
-      await fetchItemName(text);
+    };
+  
+    if (exchangeHistory.length > 0) {
+      loadAllNames();
     }
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredText(null);
-  };
+  }, [exchangeHistory]);
 
   return (
-    <div className="relative w-1/3 max-w-sm overflow-hidden">
-      <h2 className="text-xl font-bold mb-2">Exchange History</h2>
-      <div className="bg-white shadow-lg rounded-lg p-6">
-        {exchangeHistory.length > 0 ? (
-          exchangeHistory.map((record) => (
-            <div key={record.exchange_id} className="border-b p-4 hover:bg-gray-50 transition-all duration-300 rounded-lg">
-              <p className="font-bold">Exchange ID: {record.exchange_id}</p>
+    <div className="relative w-full max-w-xl mx-auto bg-gradient-to-r from-white/80 via-gray-50/80 to-gray-100/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 mt-5">
+      <h2 className="text-3xl font-bold text-center mb-6 text-gray-700 tracking-wide">
+        Exchange History
+      </h2>
   
-              {/* From */}
-              <p className="font-bold">
-                From:
-                <span
-                  className="text-blue-600 cursor-pointer hover:underline inline-flex items-center max-w-[200px] overflow-hidden text-ellipsis whitespace-normal"
-                  onMouseEnter={(e) => handleMouseEnter(record.user_1_wallet, "wallet", e)}
-                  onMouseLeave={handleMouseLeave}
-                >
-                  {walletNames[record.user_1_wallet] || record.user_1_wallet}
+      {exchangeHistory.length > 0 ? (
+        <div className="space-y-6">
+          {exchangeHistory.map((record) => (
+            <div
+              key={record.exchange_id}
+              className="rounded-2xl border border-gray-200 shadow-xl bg-white/90 p-5 hover:shadow-2xl transition-all duration-300"
+            >
+              {/* แสดงเฉพาะ Exchange ID */}
+              <p className="text-lg font-bold mb-2 flex items-center gap-2">
+                📜 Exchange ID: <span className="text-yellow-600">{record.exchange_id}</span>
+              </p>
+  
+              {/* โชว์ชื่อผู้ส่งและผู้รับ แทน address */}
+              <p>
+                <strong>From:</strong>{" "}
+                <span className="text-blue-700 font-semibold">
+                  {walletNames[record.user_1_wallet]}
+                </span>
+              </p>
+              <p>
+                <strong>To:</strong>{" "}
+                <span className="text-indigo-600 font-semibold">
+                  {walletNames[record.user_2_wallet]}
                 </span>
               </p>
   
-              {/* To */}
-              <p className="font-bold">
-                To:
-                <span
-                  className="text-blue-600 cursor-pointer hover:underline inline-flex items-center max-w-[200px] overflow-hidden text-ellipsis whitespace-normal"
-                  onMouseEnter={(e) => handleMouseEnter(record.user_2_wallet, "wallet", e)}
-                  onMouseLeave={handleMouseLeave}
-                >
-                  {walletNames[record.user_2_wallet] || record.user_2_wallet}
+              {/* โชว์ชื่อสินค้าแทน item id */}
+              <p>
+                <strong>Item Offered:</strong>{" "}
+                <span className="text-blue-700 font-semibold">
+                  {itemNames[record.item_1_id]}
+                </span>
+              </p>
+              <p>
+                <strong>Requested Item:</strong>{" "}
+                <span className="text-indigo-600 font-semibold">
+                  {itemNames[record.item_2_id]}
                 </span>
               </p>
   
-              {/* Item Offered */}
-              <p className="font-bold">
-                Item Offered:
-                <span
-                  className="text-blue-600 cursor-pointer hover:underline inline-flex items-center max-w-[200px] overflow-hidden text-ellipsis whitespace-normal"
-                  onMouseEnter={(e) => handleMouseEnter(record.item_1_id, "item", e)}
-                  onMouseLeave={handleMouseLeave}
-                >
-                  {itemNames[record.item_1_id] || record.item_1_id}
-                </span>
-              </p>
+              {/* Status ในรูปแบบ badge สวยงาม */}
+              <div className="mt-3 flex items-center gap-2">
+                <strong>Status:</strong>
+                {record.status === 1 && (
+                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                    ✅ Accepted
+                  </span>
+                )}
+                {record.status === 2 && (
+                  <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                    ❌ Rejected
+                  </span>
+                )}
+                {record.status === 0 && (
+                  <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                    ⏳ Pending
+                  </span>
+                )}
+              </div>
   
-              {/* Requested Item */}
-              <p className="font-bold">
-                Requested Item:
-                <span
-                  className="text-blue-600 cursor-pointer hover:underline inline-flex items-center max-w-[200px] overflow-hidden text-ellipsis whitespace-normal"
-                  onMouseEnter={(e) => handleMouseEnter(record.item_2_id, "item", e)}
-                  onMouseLeave={handleMouseLeave}
+              {/* ปุ่ม View on Etherscan สไตล์สวยๆ */}
+              <div className="mt-4">
+                <a
+                  href={`https://etherscan.io/tx/${record.transaction_hash}`}
+                  target="_blank"
+                  className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl shadow-md hover:opacity-90 text-sm transition-all"
                 >
-                  {itemNames[record.item_2_id] || record.item_2_id}
-                </span>
-              </p>
-  
-              <p className="font-bold">
-                Status: {record.status === 1 ? "✅ Accepted" : record.status === 2 ? "❌ Rejected" : "⏳ Pending"}
-              </p>
-              <p className="font-bold">
-                Transaction Hash:
-                <a href={`https://etherscan.io/tx/${record.transaction_hash}`} target="_blank" className="text-blue-500 underline break-words">
-                  Click to view hash
+                  View on Etherscan
                 </a>
-              </p>
+              </div>
             </div>
-          ))
-        ) : (
-          <p>No exchange history found.</p>
-        )}
-      </div>
-  
-      {/* Tooltip */}
-      {hoveredText && (
-        <div
-          className="absolute bg-black text-white text-xs rounded py-1 px-2 shadow-lg whitespace-nowrap"
-          style={{ top: tooltipPosition.y, left: tooltipPosition.x, maxWidth: "200px" }}
-        >
-          {hoveredText}
+          ))}
         </div>
+      ) : (
+        <p className="text-center text-gray-500">No exchange history found.</p>
       )}
+  
+      
     </div>
   );
+  
 };
 
 export default ExchangeHis;
